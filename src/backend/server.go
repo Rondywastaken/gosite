@@ -1,66 +1,51 @@
 package main
 
 import (
-    "context"
-    "fmt"
-    "net/http"
-    "log"
-    "os"
-    "encoding/json"
-    "time"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	/*"context"
+	  "os"
+	  "encoding/json"
+	  "time"
 
-    "github.com/lrstanley/go-ytdlp"
-)
+	  "github.com/lrstanley/go-ytdlp" */)
 
 func main()  {
-    //http.HandleFunc("/", handler)
-    //log.Fatal(http.ListenAndServe(":8080", nil))
-    exampleClient()
+    http.HandleFunc("/", handler)
+    log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func handler(res http.ResponseWriter, req *http.Request) {
-    fmt.Println(res, "Hello World!")
-}
+    res.Header().Set("Access-Control-Allow-Origin", "*")
+    res.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+    res.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-func exampleClient() {
- 	ytdlp.MustInstall(context.TODO(), nil)
+    if req.Method == "OPTIONS" {
+        res.WriteHeader(http.StatusOK)
+        return
+    }
 
-	dl := ytdlp.New().
-		PrintJSON().
-		NoProgress().
-		FormatSort("res,ext:mp4:m4a").
-		RecodeVideo("mp4").
-		NoPlaylist().
-		NoOverwrites().
-		Continue().
-		ProgressFunc(100*time.Millisecond, func(prog ytdlp.ProgressUpdate) {
-			fmt.Printf( //nolint:forbidigo
-				"%s @ %s [eta: %s] :: %s\n",
-				prog.Status,
-				prog.PercentString(),
-				prog.ETA(),
-				prog.Filename,
-			)
-		}).
-		Output("%(extractor)s - %(title)s.%(ext)s")
+    if req.Method != "POST" {
+        http.Error(res, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
 
-	r, err := dl.Run(context.TODO(), "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-	if err != nil {
-		panic(err)
-	}
+    var data struct {
+        Link string `json:"link"` 
+    }
 
-	f, err := os.Create("results.json")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
+    decoder := json.NewDecoder(req.Body)
+    if err := decoder.Decode(&data); err != nil {
+        http.Error(res, err.Error(), http.StatusBadRequest)
+        return
+    }
+    
+    fmt.Printf("Received link: %s", data.Link)
 
-	enc := json.NewEncoder(f)
-	enc.SetIndent("", "    ")
-
-	if err = enc.Encode(r); err != nil {
-		panic(err)
-	}
-
-	log.Println("wrote results to results.json")   
+    res.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(res).Encode(map[string]string{
+        "message": "Link received succesfully",
+    })
 }
